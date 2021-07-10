@@ -1,0 +1,15 @@
+[submodule "ThirdParty/jsoncpp"]
+	path = ThirdParty/jsoncpp
+	url = https://github.com/open-source-parsers/jsoncpp.git
+[submodule "ThirdParty/fmtlib"]
+	path = ThirdParty/fmtlib
+	url = https://github.com/fmtlib/fmt.git
+[submodule "ThirdParty/utilities"]
+	path = ThirdParty/utilities
+	url = https://github.com/GMLC-TDC/utilities.git
+[submodule "ThirdParty/asio"]
+	path = ThirdParty/asio
+	url = https://github.com/chriskohlhoff/asio
+[submodule "ThirdParty/concurrency"]
+	path = ThirdParty/concurrency
+	url = https://github.com/GMLC-TDC/concurrency.git
