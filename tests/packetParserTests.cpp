@@ -70,7 +70,7 @@ TEST_F(PMU_TCP, config1_test)
     auto pktType = getPacketType(pkt.data(), pkt.size());
     EXPECT_EQ(pktType, PmuPacketType::config2);
     Config cfg;
-    EXPECT_TRUE(parseConfig2(pkt.data(), pkt.size(), cfg));
+    EXPECT_EQ(parseConfig2(pkt.data(), pkt.size(), cfg), ParseResult::parse_complete);
     ASSERT_EQ(cfg.pmus.size(), 1U);
     EXPECT_EQ(cfg.pmus[0].phasorCount, 4U);
 }
@@ -89,7 +89,7 @@ TEST_F(PMU_TCP, data_one_test)
 {
     const auto &pkt = p.getPacketMatch(sync_lead, 1);
     Config cfg;
-    EXPECT_TRUE(parseConfig2(pkt.data(), pkt.size(), cfg));
+    EXPECT_EQ(parseConfig2(pkt.data(), pkt.size(), cfg),ParseResult::parse_complete);
 
     const auto &pktData = p.getPacketMatch(sync_lead, 3);
     auto pktType = getPacketType(pktData.data(), pktData.size());
@@ -104,7 +104,7 @@ TEST_F(PMU_TCP, data_sequence_test)
 
     const auto &pkt = p.getPacketMatch(sync_lead, 1);
     Config cfg;
-    EXPECT_TRUE(parseConfig2(pkt.data(), pkt.size(), cfg));
+    EXPECT_EQ(parseConfig2(pkt.data(), pkt.size(), cfg),ParseResult::parse_complete);
 
     std::uint32_t soc{0};
     float fracSec{0};
@@ -174,7 +174,7 @@ TEST_F(PMU_UDP, config1_test)
     auto pktType = getPacketType(pkt.data(), pkt.size());
     EXPECT_EQ(pktType, PmuPacketType::config2);
     Config cfg;
-    EXPECT_TRUE(parseConfig2(pkt.data(), pkt.size(), cfg));
+    EXPECT_EQ(parseConfig2(pkt.data(), pkt.size(), cfg),ParseResult::parse_complete);
     ASSERT_EQ(cfg.pmus.size(), 1U);
     EXPECT_EQ(cfg.pmus[0].phasorCount, 3U);
     EXPECT_EQ(cfg.pmus[0].digitalWordCount, 1U);
@@ -193,7 +193,7 @@ TEST_F(PMU_UDP, data_one_test)
 {
     const auto &pkt = p.getPacketMatch(sync_lead, 2);
     Config cfg;
-    EXPECT_TRUE(parseConfig2(pkt.data(), pkt.size(), cfg));
+    EXPECT_EQ(parseConfig2(pkt.data(), pkt.size(), cfg),ParseResult::parse_complete);
 
     const auto &pktData = p.getPacketMatch(sync_lead, 4);
     auto pktType = getPacketType(pktData.data(), pktData.size());
@@ -208,7 +208,7 @@ TEST_F(PMU_UDP, data_sequence_test)
 {
     const auto &pkt = p.getPacketMatch(sync_lead, 2);
     Config cfg;
-    EXPECT_TRUE(parseConfig2(pkt.data(), pkt.size(), cfg));
+    EXPECT_EQ(parseConfig2(pkt.data(), pkt.size(), cfg), ParseResult::parse_complete);
 
     std::uint32_t soc{0};
     float fracSec{0};
@@ -238,4 +238,48 @@ TEST_F(PMU_UDP, data_sequence_test)
             fracSec = pdf.fracSec;
         }
     }
+}
+
+
+TEST_F(PMU4_TCP, config1_test)
+{
+    const auto &pkt = p.getPacket( 4);
+    auto pktType = getPacketType(pkt.data(), pkt.size());
+    EXPECT_EQ(pktType, PmuPacketType::config2);
+    Config cfg;
+    auto result = parseConfig2(pkt.data(), pkt.size(), cfg);
+    if (result==ParseResult::length_mismatch)
+    {
+        std::vector<std::uint8_t> buffer(pkt.begin(), pkt.end());
+        buffer.insert(buffer.end(),p.getPacket(5).begin(), p.getPacket(5).end());
+        result = parseConfig2(buffer.data(), buffer.size(), cfg);
+    }
+    ASSERT_EQ(cfg.pmus.size(), 4U);
+    EXPECT_EQ(cfg.pmus[0].phasorCount, 3U);
+    EXPECT_EQ(cfg.pmus[0].digitalWordCount, 1U);
+}
+
+TEST_F(PMU4_TCP, data_test)
+{
+    const auto &pkt = p.getPacket(4);
+    auto pktType = getPacketType(pkt.data(), pkt.size());
+    EXPECT_EQ(pktType, PmuPacketType::config2);
+    Config cfg;
+    auto result = parseConfig2(pkt.data(), pkt.size(), cfg);
+    if (result == ParseResult::length_mismatch)
+    {
+        std::vector<std::uint8_t> buffer(pkt.begin(), pkt.end());
+        buffer.insert(buffer.end(), p.getPacket(5).begin(), p.getPacket(5).end());
+        result = parseConfig2(buffer.data(), buffer.size(), cfg);
+    }
+    ASSERT_EQ(cfg.pmus.size(), 4U);
+    EXPECT_EQ(cfg.pmus[0].phasorCount, 3U);
+    EXPECT_EQ(cfg.pmus[0].digitalWordCount, 1U);
+
+    auto &pktData = p.getPacket(7);
+    pktType = getPacketType(pktData.data(), pktData.size());
+    ASSERT_EQ(pktType, PmuPacketType::data);
+
+    auto data = parseDataFrame(pktData.data(), pktData.size(), cfg);
+
 }

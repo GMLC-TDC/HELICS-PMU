@@ -18,6 +18,7 @@ helics-pmuTests.cpp
 packetParserTests.cpp
 PcapPacketParser.h
 PcapPacketParser.cpp
+packetGenerationTests.cpp
 )
 
 
