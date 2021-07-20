@@ -300,7 +300,7 @@ std::string parseHeader(const std::uint8_t *data, size_t dataSize)
     {
         return {};
     }
-    std::string header(reinterpret_cast<const char *>(data) + 6,
+    std::string header(reinterpret_cast<const char *>(data) + 14,
                        reinterpret_cast<const char *>(data) + frame.byteCount - 2);
     return header;
 }
@@ -828,7 +828,10 @@ static std::uint16_t generatePmuDataFrame(std::uint8_t *data,
 generateDataFrame(std::uint8_t *data, size_t dataSize, const Config &config, const PmuDataFrame &frame)
 {
     std::uint16_t bytes_used{14U};
-
+    if (dataSize < getExpectedDataPacketLength(config))
+    {
+        return 0;
+    }
     generateCommonFrame(data, static_cast<std::uint16_t>(dataSize), config, PmuPacketType::data);
     addTime(data, frame.soc, frame.fracSec, frame.timeQuality, config);
     for (size_t ii=0;ii<frame.pmus.size();++ii)
@@ -844,7 +847,14 @@ generateDataFrame(std::uint8_t *data, size_t dataSize, const Config &config, con
 
 std::uint16_t generateHeader(std::uint8_t *data, size_t dataSize, const std::string &header, const Config &config)
 {
-    return 0;
+    std::uint16_t bytes_used{14U};
+
+    generateCommonFrame(data, static_cast<std::uint16_t>(dataSize), config, PmuPacketType::header);
+    addSize(data, bytes_used + static_cast<std::uint16_t>(header.size())+2U);
+    memcpy(data + bytes_used, header.data(), header.size());
+    bytes_used += static_cast<std::uint16_t>(header.size()) + 2U;
+    addCRC(data, bytes_used);
+    return bytes_used;
 }
 
 std::uint16_t generateCommand(std::uint8_t *data, size_t dataSize, PmuCommand command, const uint16_t idCode)

@@ -283,3 +283,25 @@ TEST_F(PMU4_TCP, data_test)
     auto data = parseDataFrame(pktData.data(), pktData.size(), cfg);
     EXPECT_NE(data.parseResult,ParseResult::length_mismatch);
 }
+
+TEST(header, headerGeneration)
+{
+    Config cfg;
+    cfg.idcode = 786;
+    std::vector<std::uint8_t> buffer;
+    buffer.resize(600);
+
+    std::string headerString = "this is a header string lalala!!!";
+
+    auto bsize = generateHeader(buffer.data(), 600, headerString, cfg);
+    EXPECT_GT(bsize, 10 + headerString.size());
+
+    auto id = getIdCode(buffer.data(), bsize);
+    EXPECT_EQ(id, 786);
+
+    auto type = getPacketType(buffer.data(),bsize);
+    EXPECT_EQ(type, PmuPacketType::header);
+
+    auto str = parseHeader(buffer.data(), bsize);
+    EXPECT_EQ(str, headerString);
+}

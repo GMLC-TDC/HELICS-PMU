@@ -110,8 +110,12 @@ TEST_F(PMU_TCP, data_generation)
 
     std::vector<std::uint8_t> buffer;
     buffer.resize(1024);
+    //this is too small to generate
+    auto size = generateDataFrame(buffer.data(), 22, cfg, pdf);
 
-    auto size = generateDataFrame(buffer.data(), 1024, cfg, pdf);
+    EXPECT_EQ(size, 0U);
+    // now actually try to generate it
+    size = generateDataFrame(buffer.data(), 1024, cfg, pdf);
     EXPECT_EQ(size, pktData.size());
     buffer.resize(size);
     bool match = true;
