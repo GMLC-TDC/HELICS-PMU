@@ -4,10 +4,10 @@
 
 - [x] C37.118-2011 packet parsing
 - [ ] config3 parsing
-- [ ] c37.118-2011 packet generation
+- [x] c37.118-2011 packet generation
   - [x] command generation
   - [x] config generation
-  - [ ] data generation
+  - [x] data generation
 - [ ] config3 generation
 - [ ] tcp receiver
 - [ ] udp receiver

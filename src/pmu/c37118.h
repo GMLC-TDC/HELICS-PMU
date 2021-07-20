@@ -171,10 +171,10 @@ class PmuData
   public:
    
     std::uint16_t stat;
-    float freq;
-    float rocof;
-    std::vector<std::complex<float>> phasors;
-    std::vector<float> analog;
+    double freq;
+    double rocof;
+    std::vector<std::complex<double>> phasors;
+    std::vector<double> analog;
     std::vector<std::uint16_t> digital;
 
 };
@@ -186,12 +186,16 @@ class PmuDataFrame
     std::uint8_t timeQuality;
     ParseResult parseResult{ParseResult::not_parsed};
     std::uint32_t soc;
-    float fracSec;
+    double fracSec;
     
     std::vector<PmuData> pmus;
 };
 
 PmuPacketType getPacketType(const std::uint8_t *data, size_t dataSize);
+
+std::uint16_t getIdCode(const std::uint8_t *data, size_t dataSize);
+
+std::uint16_t getPacketSize(const std::uint8_t *data, size_t dataSize);
 
 ParseResult parseCommon(const std::uint8_t *data, size_t dataSize, CommonFrame &frame);
     

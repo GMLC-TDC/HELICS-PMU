@@ -33,6 +33,13 @@ struct PMU4_TCP : public ::testing::Test
     PMU4_TCP() : p(TEST_DIR "/C37.118_4in1PMU_TCP.pcap") {}
 };
 
+struct PMU2_TCP : public ::testing::Test
+{
+  public:
+    PcapPacketParser p;
+    PMU2_TCP() : p(TEST_DIR "/C37.118_2PMUsInSync_TCP.pcap") {}
+};
+
 TEST_F(PMU_TCP, command_generation)
 { 
 
@@ -204,4 +211,70 @@ TEST_F(PMU4_TCP, data_generation)
     }
 
     EXPECT_TRUE(match);
+}
+
+
+TEST_F(PMU2_TCP, data_generation)
+{
+    const auto &pkt1 = p.getPacketMatch(sync_lead, 1);
+    auto pktType = getPacketType(pkt1.data(), pkt1.size());
+    EXPECT_EQ(pktType, PmuPacketType::config2);
+    Config cfg1;
+    auto result = parseConfig2(pkt1.data(), pkt1.size(), cfg1);
+    ASSERT_EQ(result, ParseResult::parse_complete);
+
+    const auto &pkt2 = p.getPacketMatch(sync_lead, 4);
+    pktType = getPacketType(pkt2.data(), pkt2.size());
+    EXPECT_EQ(pktType, PmuPacketType::config2);
+    Config cfg2;
+    result = parseConfig2(pkt2.data(), pkt2.size(), cfg2);
+    ASSERT_EQ(result, ParseResult::parse_complete);
+
+    int jj = 5;
+    std::size_t psize{10};
+    while (psize!=0)
+    {
+        const auto &pktData = p.getPacketMatch(sync_lead, jj++);
+        psize = pktData.size();
+        if (psize==0)
+        {
+            continue;
+        }
+        pktType = getPacketType(pktData.data(), pktData.size());
+        if (pktType != PmuPacketType::data)
+        {
+            continue;
+        }
+        auto id = getIdCode(pktData.data(), pktData.size());
+        const Config &cfg = (id == cfg1.idcode) ? cfg1 : cfg2;
+        auto data = parseDataFrame(pktData.data(), pktData.size(), cfg);
+
+        std::vector<std::uint8_t> dataBuffer;
+        dataBuffer.resize(4096);
+
+        auto sz = getPacketSize(pktData.data(), pktData.size());
+        auto size = generateDataFrame(dataBuffer.data(), 4096, cfg, data);
+        EXPECT_EQ(size, sz);
+        dataBuffer.resize(size);
+        bool match = true;
+        for (size_t ii = 0; ii < std::min(dataBuffer.size(), static_cast<size_t>(sz)); ++ii)
+        {
+            if (dataBuffer[ii] != pktData[ii])
+            {
+                std::cout << " byte [" << std::dec << ii << "] does not match pkt=" << std::hex
+                          << static_cast<std::uint32_t>(pktData[ii])
+                          << " buffer=" << static_cast<std::uint32_t>(dataBuffer[ii]) << std::dec << std::endl;
+                match = false;
+            }
+        }
+        EXPECT_TRUE(match);
+        if (!match)
+        {
+ 
+            std::cout << "packet " << jj << " failed config " << ((id == cfg1.idcode) ? 1 : 2) << "\n";
+            psize = 0;
+        }
+            
+    }
+    
 }

@@ -87,7 +87,10 @@ PcapPacketParser::PcapPacketParser(const std::string &fileName)
 
     /* open file */
     FILE *file = fopen(fileName.c_str(), "rb");
-
+    if (file==nullptr)
+    {
+        throw(std::exception("unable to open file"));
+    }
     /* read file header */
     struct pcap_global_header gheader;
 

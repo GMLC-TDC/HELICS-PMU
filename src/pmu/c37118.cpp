@@ -39,7 +39,7 @@ static void addTime(std::uint8_t *data, std::uint32_t soc, std::uint32_t fracsec
     memcpy(data + 10, &fracsec, sizeof(std::uint32_t));
 }
 
-static void addTime(std::uint8_t *data, std::uint32_t soc, float fracsec, std::uint8_t timeQuality, const Config &config)
+static void addTime(std::uint8_t *data, std::uint32_t soc, double fracsec, std::uint8_t timeQuality, const Config &config)
 {
     soc = htonl(soc);
 
@@ -106,11 +106,32 @@ ParseResult parseCommon(const std::uint8_t *data, size_t dataSize, CommonFrame &
 
 PmuPacketType getPacketType(const std::uint8_t *data, size_t dataSize)
 {
-    if (dataSize == 0 || data[0] != sync_lead)
+    if (dataSize < 16 || data[0] != sync_lead)
     {
         return PmuPacketType::unknown;
     }
     return static_cast<PmuPacketType>(data[1] & typeMask);
+}
+
+std::uint16_t getIdCode(const std::uint8_t* data, size_t dataSize) {
+
+    if (dataSize < 16 || data[0] != sync_lead)
+    {
+        return 0;
+    }
+    std::uint16_t id;
+    memcpy(&id, data + 4, sizeof(std::uint16_t));
+    return ntohs(id);
+}
+
+std::uint16_t getPacketSize(const std::uint8_t* data, size_t dataSize)
+{ 
+    if (dataSize < 16 || data[0] != sync_lead)
+    {
+        return 0;
+    }
+    std::uint16_t byteCount = data[2] * 256 + data[3];
+    return byteCount;
 }
 
 static std::size_t parsePmuConfig(const std::uint8_t *data, PmuConfig &config)
@@ -339,10 +360,10 @@ static std::size_t parsePmuData(const std::uint8_t *data, const PmuConfig &confi
                 val1 = static_cast<std::int16_t>(ntohs(static_cast<std::uint16_t>(val1)));
                 val2 = static_cast<std::int16_t>(ntohs(static_cast<std::uint16_t>(val2)));
                 pmuData.phasors[ii] =
-                  std::complex<float>(static_cast<float>(static_cast<double>(val1) * 1e-5 *
-                                                         static_cast<double>(config.phasorConversion[ii])),
-                                      static_cast<float>(static_cast<double>(val2) * 1e-5 *
-                                                         static_cast<double>(config.phasorConversion[ii])));
+                  std::complex<double>(static_cast<double>(val1) * 1e-5 *
+                                                         static_cast<double>(config.phasorConversion[ii]),
+                                      static_cast<double>(val2) * 1e-5 *
+                                                         static_cast<double>(config.phasorConversion[ii]));
             }
             else
             {
@@ -353,9 +374,9 @@ static std::size_t parsePmuData(const std::uint8_t *data, const PmuConfig &confi
                 val1 = ntohs(val1);
                 val2 = static_cast<std::int16_t>(ntohs(static_cast<std::uint16_t>(val2)));
                 pmuData.phasors[ii] =
-                  std::polar<float>(static_cast<float>(static_cast<double>(val1) * 1e-5 *
-                                                       static_cast<double>(config.phasorConversion[ii])),
-                                    static_cast<float>(static_cast<double>(val2) / 1e4));
+                  std::polar<double>(static_cast<double>(val1) * 1e-5 *
+                                                       static_cast<double>(config.phasorConversion[ii]),
+                                    static_cast<double>(val2) / 1e4);
             }
             bytes_used += sizeof(std::uint16_t) + sizeof(std::int16_t);
         }
@@ -369,11 +390,11 @@ static std::size_t parsePmuData(const std::uint8_t *data, const PmuConfig &confi
             float val2f = ntohf(val2);
             if (config.phasorCoordinates == rectangular_phasor)
             {
-                pmuData.phasors[ii] = std::complex<float>(val1f, val2f);
+                pmuData.phasors[ii] = std::complex<double>(val1f, val2f);
             }
             else
             {
-                pmuData.phasors[ii] = std::polar<float>(val1f, val2f);
+                pmuData.phasors[ii] = std::polar<double>(val1f, val2f);
             }
             bytes_used += 2 * sizeof(float);
         }
@@ -383,10 +404,10 @@ static std::size_t parsePmuData(const std::uint8_t *data, const PmuConfig &confi
     {
         std::uint32_t freqData;
         std::memcpy(&freqData, data + bytes_used, sizeof(float));
-        pmuData.freq = ntohf(freqData);
+        pmuData.freq = static_cast<double>(ntohf(freqData));
         bytes_used += sizeof(float);
         std::memcpy(&freqData, data + bytes_used, sizeof(float));
-        pmuData.rocof = ntohf(freqData);
+        pmuData.rocof = static_cast<double>(ntohf(freqData));
         bytes_used += sizeof(float);
     }
     else
@@ -395,12 +416,12 @@ static std::size_t parsePmuData(const std::uint8_t *data, const PmuConfig &confi
         std::memcpy(&freq, data + bytes_used, sizeof(freq));
         freq = static_cast<std::int16_t>(ntohs(static_cast<std::uint16_t>(freq)));
         bytes_used += sizeof(std::int16_t);
-        pmuData.freq = static_cast<float>(static_cast<double>(freq) / 1000.0);
+        pmuData.freq = static_cast<double>(freq) / 1000.0;
         /* rocof */
         std::memcpy(&freq, data + bytes_used, sizeof(freq));
         freq = static_cast<std::int16_t>(ntohs(static_cast<std::uint16_t>(freq)));
         bytes_used += sizeof(std::int16_t);
-        pmuData.rocof = static_cast<float>(static_cast<double>(freq) / 1000.0);
+        pmuData.rocof = static_cast<double>(freq) / 1000.0;
     }
 
     pmuData.analog.resize(config.analogCount);
@@ -452,7 +473,7 @@ PmuDataFrame parseDataFrame(const std::uint8_t *data, size_t dataSize, const Con
     }
     pdf.timeQuality = static_cast<std::uint8_t>(frame.fracSec >> 24);
     pdf.fracSec =
-      static_cast<float>(static_cast<double>(frame.fracSec & 0x00FFFFFFU) / static_cast<double>(config.timeBase));
+      static_cast<double>(frame.fracSec & 0x00FFFFFFU) / static_cast<double>(config.timeBase);
     pdf.soc = frame.soc;
     pdf.pmus.resize(config.pmus.size());
     std::size_t bytes_used = 14U;
@@ -516,7 +537,7 @@ static std::uint16_t
 generatePMUConfig(std::uint8_t *data, size_t dataSize, const PmuConfig &config,
                                            bool activeOnly)
     {
-    std::size_t bytes_used{0};
+    std::uint16_t bytes_used{0U};
     if (dataSize < getPmuConfigSize(config,activeOnly))
     {
         return 0;
