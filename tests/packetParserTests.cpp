@@ -281,5 +281,5 @@ TEST_F(PMU4_TCP, data_test)
     ASSERT_EQ(pktType, PmuPacketType::data);
 
     auto data = parseDataFrame(pktData.data(), pktData.size(), cfg);
-
+    EXPECT_NE(data.parseResult,ParseResult::length_mismatch);
 }

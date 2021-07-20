@@ -87,6 +87,41 @@ TEST_F(PMU_TCP, config2_generation)
 
 }
 
+TEST_F(PMU_TCP, data_generation)
+{
+    const auto &pkt = p.getPacketMatch(sync_lead, 1);
+   
+    Config cfg;
+    EXPECT_EQ(parseConfig2(pkt.data(), pkt.size(), cfg), ParseResult::parse_complete);
+
+    const auto &pktData = p.getPacketMatch(sync_lead, 3);
+    auto pktType = getPacketType(pktData.data(), pktData.size());
+    EXPECT_EQ(pktType, PmuPacketType::data);
+    auto pdf = parseDataFrame(pktData.data(), pktData.size(), cfg);
+    EXPECT_EQ(pdf.pmus.size(), 1U);
+    EXPECT_EQ(pdf.pmus[0].phasors.size(), 4U);
+
+    std::vector<std::uint8_t> buffer;
+    buffer.resize(1024);
+
+    auto size = generateDataFrame(buffer.data(), 1024, cfg, pdf);
+    EXPECT_EQ(size, pktData.size());
+    buffer.resize(size);
+    bool match = true;
+    for (size_t ii = 0; ii < std::min(buffer.size(), pktData.size()); ++ii)
+    {
+        if (buffer[ii] != pktData[ii])
+        {
+            std::cout << " byte [" << std::dec << ii << "] does not match pkt=" << std::hex
+                      << static_cast<std::uint32_t>(pktData[ii])
+                      << " buffer=" << static_cast<std::uint32_t>(buffer[ii]) << std::dec << std::endl;
+            match = false;
+        }
+    }
+
+    EXPECT_TRUE(match);
+}
+
 
 TEST_F(PMU4_TCP, config2_generation4)
 {
@@ -123,6 +158,47 @@ TEST_F(PMU4_TCP, config2_generation4)
             std::cout << " byte [" << std::dec << ii << "] does not match pkt=" << std::hex
                       << static_cast<std::uint32_t>(buffer[ii])
                       << " buffer=" << static_cast<std::uint32_t>(buffer2[ii]) << std::dec << std::endl;
+            match = false;
+        }
+    }
+
+    EXPECT_TRUE(match);
+}
+
+TEST_F(PMU4_TCP, data_generation)
+{
+    const auto &pkt = p.getPacket(4);
+    auto pktType = getPacketType(pkt.data(), pkt.size());
+    EXPECT_EQ(pktType, PmuPacketType::config2);
+    Config cfg;
+    auto result = parseConfig2(pkt.data(), pkt.size(), cfg);
+    std::vector<std::uint8_t> buffer(pkt.begin(), pkt.end());
+    if (result == ParseResult::length_mismatch)
+    {
+        buffer.insert(buffer.end(), p.getPacket(5).begin(), p.getPacket(5).end());
+        result = parseConfig2(buffer.data(), buffer.size(), cfg);
+    }
+
+    auto &pktData = p.getPacket(7);
+    pktType = getPacketType(pktData.data(), pktData.size());
+    ASSERT_EQ(pktType, PmuPacketType::data);
+
+    auto data = parseDataFrame(pktData.data(), pktData.size(), cfg);
+
+    std::vector<std::uint8_t> dataBuffer;
+    dataBuffer.resize(4096);
+
+    auto size = generateDataFrame(dataBuffer.data(), 4096, cfg, data);
+    EXPECT_EQ(size, pktData.size());
+    dataBuffer.resize(size);
+    bool match = true;
+    for (size_t ii = 0; ii < std::min(dataBuffer.size(), pktData.size()); ++ii)
+    {
+        if (dataBuffer[ii] != pktData[ii])
+        {
+            std::cout << " byte [" << std::dec << ii << "] does not match pkt=" << std::hex
+                      << static_cast<std::uint32_t>(pktData[ii])
+                      << " buffer=" << static_cast<std::uint32_t>(dataBuffer[ii]) << std::dec << std::endl;
             match = false;
         }
     }

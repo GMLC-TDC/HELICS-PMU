@@ -217,6 +217,8 @@ std::uint16_t generateHeader(std::uint8_t *data, size_t dataSize, const std::str
 
 std::uint16_t generateCommand(std::uint8_t *data, size_t dataSize, PmuCommand command, uint16_t idCode);
 
+std::uint16_t generateDataFrame(std::uint8_t *data, size_t dataSize, const Config &config, const PmuDataFrame &frame);
+
 std::pair<std::uint32_t, std::uint32_t> generateTimeCodes(std::chrono::time_point<std::chrono::system_clock> tp,
                                                           std::uint32_t timeBase = 10'000'000,
                                                           float tolerance = 0.0f );

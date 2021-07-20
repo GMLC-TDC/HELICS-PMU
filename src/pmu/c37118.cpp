@@ -39,6 +39,17 @@ static void addTime(std::uint8_t *data, std::uint32_t soc, std::uint32_t fracsec
     memcpy(data + 10, &fracsec, sizeof(std::uint32_t));
 }
 
+static void addTime(std::uint8_t *data, std::uint32_t soc, float fracsec, std::uint8_t timeQuality, const Config &config)
+{
+    soc = htonl(soc);
+
+    auto frsec = (static_cast<std::uint32_t>(fracsec * static_cast<double>(config.timeBase)) & 0x00FFFFFFU);
+    frsec += (timeQuality << 24);
+    frsec = htonl(frsec);
+    memcpy(data + 6, &soc, sizeof(std::uint32_t));
+    memcpy(data + 10, &frsec, sizeof(std::uint32_t));
+}
+
 static void addSize(std::uint8_t *data, std::uint16_t dataSize)
 {
     data[2] = static_cast<std::uint8_t>(dataSize >> 8);
@@ -680,6 +691,136 @@ std::uint16_t generateConfig2(std::uint8_t *data, size_t dataSize, const Config 
 
 std::uint16_t generateConfig3(std::uint8_t *data, size_t dataSize, const Config &config) { return 0; }
 
+static std::uint16_t generatePmuDataFrame(std::uint8_t *data,
+                                size_t dataSize,
+                                const PmuConfig &config,
+                                const PmuData &pmuData)
+{
+    std::uint16_t bytes_used{0U};
+    auto stat = htons(pmuData.stat);
+    memcpy(data, &stat, sizeof(std::uint16_t));
+    bytes_used += 2;
+    for (size_t ii=0;ii<config.phasorCount;++ii)
+    {
+        if (config.phasorFormat == integer_format)
+        {
+            if (config.phasorCoordinates == rectangular_phasor)
+            {
+                std::int16_t real = static_cast<int16_t>(static_cast<double>(pmuData.phasors[ii].real()) * 1e5 /
+                             static_cast<double>(config.phasorConversion[ii]));
+                std::int16_t imag = static_cast<int16_t>(static_cast<double>(pmuData.phasors[ii].imag()) * 1e5 /
+                             static_cast<double>(config.phasorConversion[ii]));
+
+                real = static_cast<std::int16_t>(ntohs(static_cast<std::uint16_t>(real)));
+                imag = static_cast<std::int16_t>(ntohs(static_cast<std::uint16_t>(imag)));
+                std::memcpy(data + bytes_used, &real,sizeof(std::int16_t));
+                
+            }
+            else
+            {
+                std::uint16_t mag = static_cast<uint16_t>(static_cast<double>(std::abs(pmuData.phasors[ii])) * 1e5 /
+                                                         static_cast<double>(config.phasorConversion[ii]));
+                std::int16_t angle = static_cast<int16_t>(static_cast<double>(std::arg(pmuData.phasors[ii])) * 1e4);
+
+                mag = ntohs(mag);
+                angle = static_cast<std::int16_t>(ntohs(static_cast<std::uint16_t>(angle)));
+                std::memcpy(data + bytes_used, &mag, sizeof(std::uint16_t));
+                std::memcpy(data + bytes_used + sizeof(std::uint16_t), &angle, sizeof(std::int16_t));
+
+            }
+            bytes_used += 2*sizeof(std::int16_t);
+        }
+        else
+        {
+            if (config.phasorCoordinates == rectangular_phasor)
+            {
+                auto real = htonf(pmuData.phasors[ii].real());
+
+                auto imag = htonf(pmuData.phasors[ii].imag());
+                std::memcpy(data+bytes_used, &real, sizeof(float));
+                std::memcpy(data + bytes_used + sizeof(float) , &imag, sizeof(float));
+            }
+            else
+            {
+                auto mag = htonf(std::abs(pmuData.phasors[ii]));
+
+                auto angle = htonf(std::arg(pmuData.phasors[ii]));
+                std::memcpy(data + bytes_used, &mag, sizeof(float));
+                std::memcpy(data + bytes_used + sizeof(float), &angle, sizeof(float));
+            }
+            bytes_used += 2 * sizeof(float);
+        }
+    }
+    if (config.freqFormat==floating_point_format)
+    {
+        auto freq = htonf(pmuData.freq);
+        auto rocof = htonf(pmuData.rocof);
+        std::memcpy(data + bytes_used, &freq, sizeof(float));
+        std::memcpy(data + bytes_used + sizeof(float), &rocof, sizeof(float));
+        bytes_used += 2 * sizeof(float);
+    }
+    else
+    {
+        std::int16_t freq = static_cast<int16_t>(static_cast<double>(pmuData.freq) * 1000.0);
+        std::int16_t rocof = static_cast<int16_t>(static_cast<double>(pmuData.rocof) * 1000.0);
+        
+        freq = static_cast<std::int16_t>(htons(static_cast<std::uint16_t>(freq)));
+        rocof = static_cast<std::int16_t>(htons(static_cast<std::uint16_t>(rocof)));
+
+        std::memcpy(data + bytes_used, &freq, sizeof(freq));
+
+        std::memcpy(data + bytes_used+sizeof(std::int16_t), &rocof, sizeof(rocof));
+        
+        bytes_used += 2*sizeof(std::int16_t);
+    }
+
+    for (int ii = 0; ii < config.analogCount; ++ii)
+    {
+        if (config.analogFormat == floating_point_format)
+        {
+            auto analog = htonf(pmuData.analog[ii]);
+            std::memcpy(data + bytes_used, &analog, sizeof(float));
+            bytes_used += sizeof(float);
+        }
+        else
+        {
+            std::int16_t analog = static_cast<std::int16_t>(pmuData.analog[ii]);
+            analog = static_cast<std::int16_t>(htons(static_cast<std::uint16_t>(analog)));
+              
+            std::memcpy(data + bytes_used,&analog,sizeof(analog));
+            
+            bytes_used += sizeof(analog);
+        }
+    }
+
+    for (int ii = 0; ii < config.digitalWordCount; ++ii)
+    {
+        
+        auto dword = htons(pmuData.digital[ii]);
+        std::memcpy(data + bytes_used,&dword, sizeof(std::uint16_t));
+        bytes_used += sizeof(std::uint16_t);
+    }
+    return bytes_used;
+}
+
+    std::uint16_t
+generateDataFrame(std::uint8_t *data, size_t dataSize, const Config &config, const PmuDataFrame &frame)
+{
+    std::uint16_t bytes_used{14U};
+
+    generateCommonFrame(data, static_cast<std::uint16_t>(dataSize), config, PmuPacketType::data);
+    addTime(data, frame.soc, frame.fracSec, frame.timeQuality, config);
+    for (size_t ii=0;ii<frame.pmus.size();++ii)
+    {
+        bytes_used +=
+          generatePmuDataFrame(data + bytes_used, dataSize - bytes_used, config.pmus[ii], frame.pmus[ii]);
+    }
+    bytes_used += 2;
+    addSize(data, bytes_used);
+    addCRC(data, bytes_used);
+    return bytes_used;
+}
+
 std::uint16_t generateHeader(std::uint8_t *data, size_t dataSize, const std::string &header, const Config &config)
 {
     return 0;
@@ -717,5 +858,7 @@ std::pair<std::uint32_t, std::uint32_t> generateTimeCodes(std::chrono::time_poin
 
     return res;
 }
+
+
 
 }  // namespace c37118
