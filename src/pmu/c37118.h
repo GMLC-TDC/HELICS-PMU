@@ -89,6 +89,10 @@ static constexpr std::uint8_t floating_point_format{1U};
 static constexpr std::uint8_t rectangular_phasor{0U};
 static constexpr std::uint8_t polar_phasor{1U};
 
+static constexpr std::uint16_t common_frame_size{14U};
+static constexpr std::uint16_t min_packet_size{18U};
+static constexpr std::uint16_t channel_name_size{16U};
+
 enum class PhasorType : std::uint8_t
 {
     voltage = 0, 
@@ -208,6 +212,8 @@ ParseResult parseConfig3(const std::uint8_t *data, size_t dataSize, Config &conf
 std::string parseHeader(const std::uint8_t *data, size_t dataSize);
 
 PmuCommand parseCommand(const std::uint8_t *data, size_t dataSize);
+
+std::string getExtendedData(const std::uint8_t *data, size_t dataSize);
 
 PmuDataFrame parseDataFrame(const std::uint8_t *data, size_t dataSize, const Config &config);
 

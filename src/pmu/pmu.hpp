@@ -14,7 +14,7 @@ namespace pmu
       public:
         std::string address;
         std::string port;
-
+        std::uint16_t idCode;
         c37118::Config config;
 
         helics::tcp::TcpConnection::pointer connection;

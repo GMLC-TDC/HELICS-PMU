@@ -293,6 +293,7 @@ static std::uint8_t getTimeQualityCode(float tolerance)
     return code;
 }
 
+static constexpr int command_location{14};
 std::string parseHeader(const std::uint8_t *data, size_t dataSize)
 {
     CommonFrame frame;
@@ -300,7 +301,7 @@ std::string parseHeader(const std::uint8_t *data, size_t dataSize)
     {
         return {};
     }
-    std::string header(reinterpret_cast<const char *>(data) + 14,
+    std::string header(reinterpret_cast<const char *>(data) + command_location,
                        reinterpret_cast<const char *>(data) + frame.byteCount - 2);
     return header;
 }
@@ -316,14 +317,34 @@ PmuCommand parseCommand(const std::uint8_t *data, size_t dataSize)
     {
         return PmuCommand::unknown;
     }
-    std::uint16_t commandCode = (static_cast<std::uint16_t>(data[14]) << 8) + data[15];
+    std::uint16_t commandCode = (static_cast<std::uint16_t>(data[command_location]) << 8) + data[command_location+1];
 
     return static_cast<PmuCommand>(commandCode);
 }
 
+std::string getExtendedData(const std::uint8_t* data, size_t dataSize) {
+    CommonFrame frame;
+    if (parseCommon(data, dataSize, frame) != ParseResult::parse_complete)
+    {
+        return {};
+    }
+    if (frame.type != PmuPacketType::command)
+    {
+        return {};
+    }
+    std::uint16_t commandCode = (static_cast<std::uint16_t>(data[command_location]) << 8) + data[command_location+1];
+    if (commandCode!=extended_frame_command)
+    {
+        return {};
+    }
+    std::string ed(reinterpret_cast<const char *>(data) + common_frame_size,
+                       reinterpret_cast<const char *>(data) + frame.byteCount - 2);
+    return ed;
+}
+
 static std::size_t getExpectedDataPacketLength(const Config &config)
 {
-    std::size_t dataSize{16U};
+    std::size_t dataSize{common_frame_size+2U};
     for (const auto &pmu : config.pmus)
     {
         dataSize += 2U;
@@ -476,7 +497,7 @@ PmuDataFrame parseDataFrame(const std::uint8_t *data, size_t dataSize, const Con
       static_cast<double>(frame.fracSec & 0x00FFFFFFU) / static_cast<double>(config.timeBase);
     pdf.soc = frame.soc;
     pdf.pmus.resize(config.pmus.size());
-    std::size_t bytes_used = 14U;
+    std::size_t bytes_used{common_frame_size};
     auto expectedSize = getExpectedDataPacketLength(config);
     if (expectedSize > dataSize)
     {
@@ -492,7 +513,7 @@ PmuDataFrame parseDataFrame(const std::uint8_t *data, size_t dataSize, const Con
 
 static void generateCommonFrame(std::uint8_t *data, std::uint16_t dataSize, uint16_t idCode, PmuPacketType type)
 {
-    if (dataSize < 18)
+    if (dataSize < min_packet_size)
     {
         return;
     }
@@ -505,7 +526,7 @@ static void generateCommonFrame(std::uint8_t *data, std::uint16_t dataSize, uint
 static void
 generateCommonFrame(std::uint8_t *data, std::uint16_t dataSize, const Config &config, PmuPacketType type)
 {
-    if (dataSize < 18)
+    if (dataSize < min_packet_size)
     {
         return;
     }
@@ -518,14 +539,15 @@ generateCommonFrame(std::uint8_t *data, std::uint16_t dataSize, const Config &co
 static std::uint16_t getPmuConfigSize(const PmuConfig &config, bool activeOnly)
 {
     std::uint16_t byte_count{30U};
-    byte_count += 20U * config.phasorCount;
-    byte_count += 20U * config.analogCount;
-    byte_count += (16U * 16U + 4) * config.digitalWordCount;
+    byte_count += (channel_name_size+sizeof(std::uint32_t)) * config.phasorCount;
+    byte_count += (channel_name_size + sizeof(std::uint32_t)) * config.analogCount;
+    byte_count += (16U * channel_name_size + 2*sizeof(std::uint16_t)) * config.digitalWordCount;
     return byte_count;
 }
 
 static std::uint16_t getConfigSize(const Config &config, bool activeOnly)
-{ std::uint16_t byte_count{24U};
+{ 
+    std::uint16_t byte_count{24U};
     for (const auto &pmu:config.pmus)
     {
         byte_count += getPmuConfigSize(pmu, activeOnly);
@@ -533,6 +555,7 @@ static std::uint16_t getConfigSize(const Config &config, bool activeOnly)
     return byte_count;
 }
 
+static constexpr std::uint16_t low_byte_mask{0xFF};
 static std::uint16_t
 generatePMUConfig(std::uint8_t *data, size_t dataSize, const PmuConfig &config,
                                            bool activeOnly)
@@ -542,13 +565,13 @@ generatePMUConfig(std::uint8_t *data, size_t dataSize, const PmuConfig &config,
     {
         return 0;
     }
-    auto nameSize = std::min(config.stationName.size(), 16ULL);
+    auto nameSize = std::min(config.stationName.size(), static_cast<std::size_t>(channel_name_size));
     memcpy(data, config.stationName.data(), nameSize);
-    if (nameSize < 16)
+    if (nameSize < channel_name_size)
     {
-        memset(data + nameSize, 0, 16 - nameSize);
+        memset(data + nameSize, 0, channel_name_size - nameSize);
     }
-    bytes_used = 16;
+    bytes_used = static_cast<std::uint16_t>(channel_name_size);
     auto sid = htons(config.sourceID);
     memcpy(data + bytes_used, &sid, sizeof(config.sourceID));
 
@@ -565,50 +588,50 @@ generatePMUConfig(std::uint8_t *data, size_t dataSize, const PmuConfig &config,
     memcpy(data + bytes_used, &format, sizeof(format));
     bytes_used += sizeof(format);
 
-    data[bytes_used] = static_cast<std::uint8_t>((config.phasorCount >> 8) & 0xFF);
-    data[bytes_used + 1] = static_cast<std::uint8_t>((config.phasorCount) & 0xFF);
+    data[bytes_used] = static_cast<std::uint8_t>((config.phasorCount >> 8) & low_byte_mask);
+    data[bytes_used + 1] = static_cast<std::uint8_t>((config.phasorCount) & low_byte_mask);
     bytes_used += 2;
 
-    data[bytes_used] = static_cast<std::uint8_t>((config.analogCount >> 8) & 0xFF);
-    data[bytes_used + 1] = static_cast<std::uint8_t>((config.analogCount) & 0xFF);
+    data[bytes_used] = static_cast<std::uint8_t>((config.analogCount >> 8) & low_byte_mask);
+    data[bytes_used + 1] = static_cast<std::uint8_t>((config.analogCount) & low_byte_mask);
     bytes_used += 2;
 
 
-    data[bytes_used] = static_cast<std::uint8_t>((config.digitalWordCount >> 8) & 0xFF);
-    data[bytes_used + 1] = static_cast<std::uint8_t>((config.digitalWordCount) & 0xFF);
+    data[bytes_used] = static_cast<std::uint8_t>((config.digitalWordCount >> 8) & low_byte_mask);
+    data[bytes_used + 1] = static_cast<std::uint8_t>((config.digitalWordCount) & low_byte_mask);
     bytes_used += 2;
 
     for (const auto& pn : config.phasorNames)
     {
-        nameSize = std::min(pn.size(), 16ULL);
+        nameSize = std::min(pn.size(), static_cast<std::size_t>(channel_name_size));
         memcpy(data+bytes_used, pn.data(), nameSize);
-        if (nameSize < 16)
+        if (nameSize < channel_name_size)
         {
-            memset(data +bytes_used+nameSize, 0, 16 - nameSize);
+            memset(data + bytes_used + nameSize, 0, channel_name_size - nameSize);
         }
-        bytes_used+=16;
+        bytes_used += channel_name_size;
     }
 
     for (const auto &an : config.analogNames)
     {
-        nameSize = std::min(an.size(), 16ULL);
+        nameSize = std::min(an.size(), static_cast<std::size_t>(channel_name_size));
         memcpy(data + bytes_used, an.data(), nameSize);
-        if (nameSize < 16)
+        if (nameSize < channel_name_size)
         {
-            memset(data + bytes_used + nameSize, 0, 16 - nameSize);
+            memset(data + bytes_used + nameSize, 0, channel_name_size - nameSize);
         }
-        bytes_used += 16;
+        bytes_used += channel_name_size;
     }
 
     for (const auto &an : config.digitChannelNames)
     {
-        nameSize = std::min(an.size(), 16ULL);
+        nameSize = std::min(an.size(), static_cast<std::size_t>(channel_name_size));
         memcpy(data + bytes_used, an.data(), nameSize);
-        if (nameSize < 16)
+        if (nameSize < channel_name_size)
         {
-            memset(data + bytes_used + nameSize, 0, 16 - nameSize);
+            memset(data + bytes_used + nameSize, 0, channel_name_size - nameSize);
         }
-        bytes_used += 16;
+        bytes_used += channel_name_size;
     }
 
     for (int ii = 0; ii < config.phasorCount; ++ii)
@@ -616,11 +639,11 @@ generatePMUConfig(std::uint8_t *data, size_t dataSize, const PmuConfig &config,
         
         data[bytes_used] = static_cast<std::uint8_t>(config.phasorType[ii]);
 
-        data[bytes_used + 1] = static_cast<std::uint8_t>((config.phasorConversion[ii] >> 16) & 0xFF);
-        data[bytes_used + 2] = static_cast<std::uint8_t>((config.phasorConversion[ii] >> 8) & 0xFF);
-        data[bytes_used + 3] = static_cast<std::uint8_t>((config.phasorConversion[ii]) & 0xFF);
+        data[bytes_used + 1] = static_cast<std::uint8_t>((config.phasorConversion[ii] >> 16) & low_byte_mask);
+        data[bytes_used + 2] = static_cast<std::uint8_t>((config.phasorConversion[ii] >> 8) & low_byte_mask);
+        data[bytes_used + 3] = static_cast<std::uint8_t>((config.phasorConversion[ii]) & low_byte_mask);
 
-        bytes_used += 4;
+        bytes_used += sizeof(std::uint32_t);
     }
 
 
@@ -632,26 +655,26 @@ generatePMUConfig(std::uint8_t *data, size_t dataSize, const PmuConfig &config,
         data[bytes_used] = static_cast<std::uint8_t>(config.analogType[ii]);
 
 
-        bytes_used += 4;
+        bytes_used += sizeof(std::uint32_t);
     }
 
     for (int ii = 0; ii < config.digitalWordCount; ++ii)
     {
-        data[bytes_used] = static_cast<std::uint8_t>((config.digitalNominal[ii] >> 8) & 0xFF);
-        data[bytes_used + 1] = static_cast<std::uint8_t>((config.digitalNominal[ii]) & 0xFF);
+        data[bytes_used] = static_cast<std::uint8_t>((config.digitalNominal[ii] >> 8) & low_byte_mask);
+        data[bytes_used + 1] = static_cast<std::uint8_t>((config.digitalNominal[ii]) & low_byte_mask);
         // for data rate
         bytes_used += 2;
 
-        data[bytes_used] = static_cast<std::uint8_t>((config.digitalActive[ii] >> 8) & 0xFF);
-        data[bytes_used + 1] = static_cast<std::uint8_t>((config.digitalActive[ii]) & 0xFF);
+        data[bytes_used] = static_cast<std::uint8_t>((config.digitalActive[ii] >> 8) & low_byte_mask);
+        data[bytes_used + 1] = static_cast<std::uint8_t>((config.digitalActive[ii]) & low_byte_mask);
         // for data rate
         bytes_used += 2;
     }
     data[bytes_used] = 0U;
     data[bytes_used + 1] = (config.nominalFrequency == 50.0f) ? 1U : 0U;
     bytes_used += 2;
-    data[bytes_used] = static_cast<std::uint8_t>((config.changeCount >> 8) & 0xFF);
-    data[bytes_used + 1] = static_cast<std::uint8_t>((config.changeCount) & 0xFF);
+    data[bytes_used] = static_cast<std::uint8_t>((config.changeCount >> 8) & low_byte_mask);
+    data[bytes_used + 1] = static_cast<std::uint8_t>((config.changeCount) & low_byte_mask);
     bytes_used += 2;
 
     return bytes_used;
@@ -667,13 +690,13 @@ static std::uint16_t generateConfig(std::uint8_t *data, size_t dataSize, const C
      }
      addTime(data, config.soc, config.fracsec);
      //time base
-     data[15] = static_cast<std::uint8_t>((config.timeBase >> 16) & 0xFF);
-     data[16] = static_cast<std::uint8_t>((config.timeBase >> 8) & 0xFF);
-     data[17] = static_cast<std::uint8_t>((config.timeBase) & 0xFF);
+     data[15] = static_cast<std::uint8_t>((config.timeBase >> 16) & low_byte_mask);
+     data[16] = static_cast<std::uint8_t>((config.timeBase >> 8) & low_byte_mask);
+     data[17] = static_cast<std::uint8_t>((config.timeBase) & low_byte_mask);
     
      auto pmuCnt=config.pmus.size();
-     data[18] = static_cast<std::uint8_t>((pmuCnt >> 8) & 0xFF);
-     data[19] = static_cast<std::uint8_t>((pmuCnt) & 0xFF);
+     data[18] = static_cast<std::uint8_t>((pmuCnt >> 8) & low_byte_mask);
+     data[19] = static_cast<std::uint8_t>((pmuCnt)&low_byte_mask);
      std::uint16_t bytes_used{20};
 
     for (const auto &pmu:config.pmus)
@@ -684,8 +707,8 @@ static std::uint16_t generateConfig(std::uint8_t *data, size_t dataSize, const C
         }
     }
 
-     data[bytes_used] = static_cast<std::uint8_t>((config.dataRate >> 8) & 0xFF);
-    data[bytes_used+1] = static_cast<std::uint8_t>((config.dataRate) & 0xFF);
+     data[bytes_used] = static_cast<std::uint8_t>((config.dataRate >> 8) & low_byte_mask);
+    data[bytes_used + 1] = static_cast<std::uint8_t>((config.dataRate) & low_byte_mask);
     // for data rate
     bytes_used += 2;
     // for checksum
@@ -713,7 +736,6 @@ std::uint16_t generateConfig2(std::uint8_t *data, size_t dataSize, const Config 
 std::uint16_t generateConfig3(std::uint8_t *data, size_t dataSize, const Config &config) { return 0; }
 
 static std::uint16_t generatePmuDataFrame(std::uint8_t *data,
-                                size_t dataSize,
                                 const PmuConfig &config,
                                 const PmuData &pmuData)
 {
@@ -827,7 +849,7 @@ static std::uint16_t generatePmuDataFrame(std::uint8_t *data,
     std::uint16_t
 generateDataFrame(std::uint8_t *data, size_t dataSize, const Config &config, const PmuDataFrame &frame)
 {
-    std::uint16_t bytes_used{14U};
+    std::uint16_t bytes_used{common_frame_size};
     if (dataSize < getExpectedDataPacketLength(config))
     {
         return 0;
@@ -837,7 +859,7 @@ generateDataFrame(std::uint8_t *data, size_t dataSize, const Config &config, con
     for (size_t ii=0;ii<frame.pmus.size();++ii)
     {
         bytes_used +=
-          generatePmuDataFrame(data + bytes_used, dataSize - bytes_used, config.pmus[ii], frame.pmus[ii]);
+          generatePmuDataFrame(data + bytes_used, config.pmus[ii], frame.pmus[ii]);
     }
     bytes_used += 2;
     addSize(data, bytes_used);
@@ -847,12 +869,31 @@ generateDataFrame(std::uint8_t *data, size_t dataSize, const Config &config, con
 
 std::uint16_t generateHeader(std::uint8_t *data, size_t dataSize, const std::string &header, const Config &config)
 {
-    std::uint16_t bytes_used{14U};
+    std::uint16_t bytes_used{common_frame_size};
 
     generateCommonFrame(data, static_cast<std::uint16_t>(dataSize), config, PmuPacketType::header);
     addSize(data, bytes_used + static_cast<std::uint16_t>(header.size())+2U);
     memcpy(data + bytes_used, header.data(), header.size());
     bytes_used += static_cast<std::uint16_t>(header.size()) + 2U;
+    addCRC(data, bytes_used);
+    return bytes_used;
+}
+
+std::uint16_t
+generateExtendedFrame(std::uint8_t *data, size_t dataSize, const std::string &frameData, const uint16_t idCode)
+{
+    std::uint16_t bytes_used{common_frame_size};
+
+    generateCommonFrame(data, static_cast<std::uint16_t>(dataSize), idCode, PmuPacketType::command);
+
+    // add the actual command
+    auto cmd = htons(static_cast<std::uint16_t>(extended_frame_command));
+
+    memcpy(data + bytes_used, &cmd, 2);
+    bytes_used += 2;
+    addSize(data, bytes_used + static_cast<std::uint16_t>(frameData.size()) + 2U);
+    memcpy(data + bytes_used, frameData.data(), frameData.size());
+    bytes_used += static_cast<std::uint16_t>(frameData.size()) + 2U;
     addCRC(data, bytes_used);
     return bytes_used;
 }
@@ -864,7 +905,7 @@ std::uint16_t generateCommand(std::uint8_t *data, size_t dataSize, PmuCommand co
     // add the actual command
     auto cmd = htons(static_cast<std::uint16_t>(command));
 
-    memcpy(data + 14, &cmd, 2);
+    memcpy(data + common_frame_size, &cmd, 2);
     addSize(data, commandSize);
     addCRC(data, commandSize);
     return commandSize;

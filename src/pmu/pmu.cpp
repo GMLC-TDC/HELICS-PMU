@@ -18,10 +18,15 @@ namespace pmu
 
 	bool Receiver::getConfig() {
         
-        auto size=c37118::generateCommand(buffer.data(), 65536, c37118::PmuCommand::send_config2, 345);
+        auto size=c37118::generateCommand(buffer.data(), 65536, c37118::PmuCommand::send_config2, idCode);
         connection->send(buffer.data(), size);
         auto sz=connection->receive(buffer.data(), 65536);
-        c37118::Config cfg;
-        return c37118::parseConfig2(buffer.data(), sz, config) == c37118::ParseResult::parse_complete;
+        c37118::ParseResult pr;
+        for (pr=c37118::parseConfig2(buffer.data(), sz, config);pr==c37118::ParseResult::length_mismatch;)
+        {
+            auto sz2 = connection->receive(buffer.data()+sz, 65536);
+            sz += sz2;
+        }
+        return (pr == c37118::ParseResult::parse_complete);
 	}
     }
