@@ -23,5 +23,7 @@ namespace pmu
 
         bool connect(asio::io_context &io_context);
         bool getConfig();
+        void startData();
+        void stopData();
 	};
 }

@@ -19,6 +19,7 @@ packetParserTests.cpp
 PcapPacketParser.h
 PcapPacketParser.cpp
 packetGenerationTests.cpp
+SourceTests.cpp
 )
 
 

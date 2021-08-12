@@ -4,7 +4,7 @@ Battelle Memorial Institute; Lawrence Livermore National Security, LLC; Alliance
 the top-level NOTICE for additional details. All rights reserved. SPDX-License-Identifier: BSD-3-Clause
 */
 
-#include "pmu.hpp"
+#include "Receiver.hpp"
 namespace pmu
 {
 
@@ -29,4 +29,16 @@ namespace pmu
         }
         return (pr == c37118::ParseResult::parse_complete);
 	}
+
+    void Receiver::startData() {
+        auto size = c37118::generateCommand(buffer.data(), 65536, c37118::PmuCommand::data_on, idCode);
+        connection->send(buffer.data(), size);
+    }
+
+    void Receiver::stopData()
+    {
+        auto size = c37118::generateCommand(buffer.data(), 65536, c37118::PmuCommand::data_off, idCode);
+        connection->send(buffer.data(), size);
+    }
+
     }
