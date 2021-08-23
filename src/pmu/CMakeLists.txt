@@ -13,6 +13,9 @@ set(pmu_sources
     c37118.cpp
     tcpHelperClasses.cpp
     StableSource.cpp
+    Pmu.cpp
+    configure.cpp
+    JsonProcessingFunctions.cpp
 	)
 
 set(pmu_headers
@@ -24,11 +27,16 @@ set(pmu_headers
     fmt_format.h
     GuardedTypes.hpp
     StableSource.hpp
+    Pmu.hpp
+    configure.hpp
+    JsonProcessingFunctions.hpp
+    ${PROJECT_SOURCE_DIR}/ThirdParty/date/tz.cpp
 	)
 
 
 
 add_library(pmu ${pmu_sources} ${pmu_headers})
 
-target_link_libraries(pmu helics_pmu_base)
+target_link_libraries(pmu HELICS-PMU::jsoncpp helics_pmu_base)
 
+target_include_directories(pmu PRIVATE ${PROJECT_SOURCE_DIR}/ThirdParty)

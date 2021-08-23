@@ -16,6 +16,6 @@
 
 int main(int argc, char *argv[])
 {
-    pmu::Receiver pmu1;
+    //pmu::Receiver pmu1;
     return 0;
 }

@@ -3,12 +3,17 @@
 **NOTE  this is a work in progress and is not fully functional**
 
 - [x] C37.118-2011 packet parsing
-- [ ] config3 parsing
 - [x] c37.118-2011 packet generation
   - [x] command generation
   - [x] config generation
   - [x] data generation
+- [ ] config3 parsing
 - [ ] config3 generation
+- [ ] synthetic signal generators
+  - [ ] constant generator
+  - [ ] modulated generator
+  - [ ] random generator
+  - [ ] digital random generator
 - [ ] tcp receiver
 - [ ] udp receiver
 - [ ] tcp transmission
@@ -17,7 +22,7 @@
 - [ ] HELICS input
 - [ ] file archiving
 - [ ] file player
-- [ ] configuration parsing
+- [ ] config file parsing, JSON
 - [ ] documentation
 
 

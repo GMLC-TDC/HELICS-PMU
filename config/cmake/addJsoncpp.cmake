@@ -1,5 +1,5 @@
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-# Copyright (c) 2017-2020, Battelle Memorial Institute; Lawrence Livermore
+# Copyright (c) 2017-2021, Battelle Memorial Institute; Lawrence Livermore
 # National Security, LLC; Alliance for Sustainable Energy, LLC.
 # See the top-level NOTICE for additional details.
 # All rights reserved.
@@ -19,7 +19,7 @@ if (MSVC)
 if(STATIC_STANDARD_LIB STREQUAL "default")
     set(JSONCPP_STATIC_WINDOWS_RUNTIME OFF CACHE INTERNAL "")
 elseif(STATIC_STANDARD_LIB STREQUAL "static")
-    set(JSONCPP_STATIC_WINDOWS_RUNTIME ON CACHE INTERNAL "")
+    set(JSONCPP_STATIC_WINDOWS_RUNTIME OFF CACHE INTERNAL "")
 elseif(STATIC_STANDARD_LIB STREQUAL "dynamic")
     set(JSONCPP_STATIC_WINDOWS_RUNTIME OFF CACHE INTERNAL "")
 endif()
@@ -32,7 +32,7 @@ set(INSTALL_EXPORT "" CACHE INTERNAL "")
 set(JSONCPP_DISABLE_CCACHE ON CACHE INTERNAL "")
 
 if(NOT CMAKE_CXX_STANDARD)
-    set(CMAKE_CXX_STANDARD 14) # Supported values are ``11``, ``14``, and ``17``.
+    set(CMAKE_CXX_STANDARD 17) # Supported values are ``11``, ``14``, and ``17``.
 endif()
 
 if(BUILD_SHARED_LIBS)
@@ -57,8 +57,8 @@ set(HAVE_LOCALECONV ON)
 set(COMPILER_HAS_DEPRECATED ON)
 set(HAVE_STDINT_H ON)
 set(HAVE_DECIMAL_POINT ON)
-add_subdirectory("${PROJECT_SOURCE_DIR}/ThirdParty/json_cpp"
-                 "${PROJECT_BINARY_DIR}/ThirdParty/json_cpp" EXCLUDE_FROM_ALL)
+add_subdirectory("${PROJECT_SOURCE_DIR}/ThirdParty/jsoncpp"
+                 "${PROJECT_BINARY_DIR}/ThirdParty/jsoncpp" EXCLUDE_FROM_ALL)
 
 
 set_target_properties(jsoncpp_static PROPERTIES FOLDER Extern)

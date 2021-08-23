@@ -7,6 +7,8 @@ the top-level NOTICE for additional details. All rights reserved. SPDX-License-I
 #include <gtest/gtest.h>
 #include "PcapPacketParser.h"
 #include "../src/pmu/c37118.h"
+#include "../src/pmu/configure.hpp"
+#include <filesystem>
 
 using namespace c37118;
 
@@ -281,4 +283,47 @@ TEST_F(PMU2_TCP, data_generation)
             
     }
     
+}
+
+
+TEST_F(PMU_TCP, json_config_generation)
+{
+    const auto &pkt = p.getPacketMatch(sync_lead, 1);
+    auto pktType = getPacketType(pkt.data(), pkt.size());
+    EXPECT_EQ(pktType, PmuPacketType::config2);
+    Config cfg;
+    EXPECT_EQ(parseConfig2(pkt.data(), pkt.size(), cfg), ParseResult::parse_complete);
+
+    std::string fileName{"configTest.json"};
+    writeConfig(fileName, cfg);
+
+    EXPECT_TRUE(std::filesystem::exists(fileName));
+
+    Config cfg2 = loadConfig(fileName);
+    cfg2.soc = cfg.soc;
+    cfg2.fracsec = cfg.fracsec;
+
+    
+
+    std::vector<std::uint8_t> buffer;
+    buffer.resize(1024);
+    //make sure the json store and load matches the original config
+    auto size = generateConfig2(buffer.data(), 1024, cfg2);
+    EXPECT_EQ(size, pkt.size());
+    buffer.resize(size);
+    bool match = true;
+    for (size_t ii = 0; ii < std::min(buffer.size(), pkt.size()); ++ii)
+    {
+        if (buffer[ii] != pkt[ii])
+        {
+            std::cout << " byte [" << std::dec << ii << "] of " << pkt.size() << " does not match pkt =" << std::hex
+                      << static_cast<std::uint32_t>(pkt[ii])
+                      << " buffer=" << static_cast<std::uint32_t>(buffer[ii]) << std::dec << std::endl;
+            match = false;
+        }
+    }
+
+    EXPECT_TRUE(match);
+
+    std::filesystem::remove(fileName);
 }

@@ -138,7 +138,7 @@ class PmuConfig
     float lon;
     float elev;
 
-    std::uint16_t changeCount;
+    std::uint16_t changeCount{0};
     bool active{true};
     std::uint32_t window;
     std::uint32_t grpDelay;
@@ -148,11 +148,11 @@ class PmuConfig
 class Config
 {
   public:
-    std::uint16_t idcode;
-    std::uint16_t dataRate;
+    std::uint16_t idcode{0};
+    std::int16_t dataRate{30};
     std::uint32_t soc;
     std::uint32_t fracsec;
-    std::uint32_t timeBase;
+    std::uint32_t timeBase{1000000};
     std::vector<PmuConfig> pmus;
 };
 

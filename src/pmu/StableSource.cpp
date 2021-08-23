@@ -9,8 +9,7 @@ the top-level NOTICE for additional details. All rights reserved. SPDX-License-I
 namespace pmu
 {
 
-
-    void StableSource::loadConfig() { config = stableConfig;
+    void StableSource::loadConfig(const std::string &configStr) { config = stableConfig;
     }
 
     void StableSource::loadDataFrame(const c37118::Config &dataConfig,

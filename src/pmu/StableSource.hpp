@@ -8,13 +8,13 @@ the top-level NOTICE for additional details. All rights reserved. SPDX-License-I
 
 namespace pmu
 {
-	class StableSource: public TcpSource
+	class StableSource: public Source
 	{
       public:
         c37118::PmuDataFrame stableData;
         c37118::Config stableConfig;
 
-         virtual void loadConfig() override;
+         virtual void loadConfig(const std::string &configStr) override;
 
         virtual void loadDataFrame(const c37118::Config &dataConfig,
                                    c37118::PmuDataFrame &frame,

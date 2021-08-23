@@ -5,8 +5,8 @@ the top-level NOTICE for additional details. All rights reserved. SPDX-License-I
 */
 #pragma once
 #include "c37118.h"
-#include "TcpHelperClasses.h"
-#include <memory>
+
+#include <chrono>
 
 namespace pmu
 {
@@ -18,30 +18,11 @@ namespace pmu
 
       public:
         /** load the system configuration*/
-        virtual void loadConfig();
+        virtual void loadConfig(const std::string &configStr);
 
         virtual void loadDataFrame(const c37118::Config &dataConfig,
                                    c37118::PmuDataFrame &frame,
                                    std::chrono::time_point<std::chrono::system_clock> current_time) = 0;
     };
-
-	class TcpPmu
-{
-      protected:
-        std::string interface;
-        std::string port{"4712"};
-
-        std::shared_ptr<Source> source;
-
-        std::chrono::time_point<std::chrono::system_clock> start_time;
-        double TimeMultiplier{1.0};
-
-      private:
-        helics::tcp::TcpConnection::pointer connection;
-
-        std::vector<std::uint8_t> buffer;
-
-      public:
-       void startServer(asio::io_context &io_context);
-	};
+	
 }
