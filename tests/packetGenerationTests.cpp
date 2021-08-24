@@ -8,6 +8,7 @@ the top-level NOTICE for additional details. All rights reserved. SPDX-License-I
 #include "PcapPacketParser.h"
 #include "../src/pmu/c37118.h"
 #include "../src/pmu/configure.hpp"
+#include "../src/pmu/JsonProcessingFunctions.hpp"
 #include <filesystem>
 
 using namespace c37118;
@@ -156,6 +157,7 @@ TEST_F(PMU4_TCP, config2_generation4)
     std::vector<std::uint8_t> buffer2;
     buffer2.resize(2*buffer.size());
 
+    // test generation failure for insufficient buffer
     auto size = generateConfig2(buffer2.data(), 2048, cfg);
     EXPECT_EQ(size, 0U);
 
@@ -312,11 +314,13 @@ TEST_F(PMU_TCP, json_config_generation)
     EXPECT_EQ(size, pkt.size());
     buffer.resize(size);
     bool match = true;
-    for (size_t ii = 0; ii < std::min(buffer.size(), pkt.size()); ++ii)
+    for (size_t ii = 0; ii < std::min(static_cast<std::size_t>(size), pkt.size()); ++ii)
     {
         if (buffer[ii] != pkt[ii])
         {
-            std::cout << " byte [" << std::dec << ii << "] of " << pkt.size() << " does not match pkt =" << std::hex
+            std::cout << " byte [" << std::dec << ii << "] of "
+                      << std::min(static_cast<std::size_t>(size), pkt.size())
+                      << " does not match pkt =" << std::hex
                       << static_cast<std::uint32_t>(pkt[ii])
                       << " buffer=" << static_cast<std::uint32_t>(buffer[ii]) << std::dec << std::endl;
             match = false;
@@ -326,4 +330,99 @@ TEST_F(PMU_TCP, json_config_generation)
     EXPECT_TRUE(match);
 
     std::filesystem::remove(fileName);
+}
+
+
+
+TEST_F(PMU4_TCP, json_config_generation)
+{
+    const auto &pkt = p.getPacket(4);
+    auto pktType = getPacketType(pkt.data(), pkt.size());
+    EXPECT_EQ(pktType, PmuPacketType::config2);
+    Config cfg;
+    auto result = parseConfig2(pkt.data(), pkt.size(), cfg);
+    std::vector<std::uint8_t> buffer(pkt.begin(), pkt.end());
+    if (result == ParseResult::length_mismatch)
+    {
+        buffer.insert(buffer.end(), p.getPacket(5).begin(), p.getPacket(5).end());
+        result = parseConfig2(buffer.data(), buffer.size(), cfg);
+    }
+    
+    std::string fileName{"configTest4.json"};
+    writeConfig(fileName, cfg);
+
+    EXPECT_TRUE(std::filesystem::exists(fileName));
+
+    Config cfg2 = loadConfig(fileName);
+    cfg2.soc = cfg.soc;
+    cfg2.fracsec = cfg.fracsec;
+
+    std::vector<std::uint8_t> buffer2;
+    buffer2.resize(2 * buffer.size());
+
+    auto size = generateConfig2(buffer2.data(), 2 * buffer.size(), cfg2);
+    EXPECT_EQ(size, buffer.size());
+
+    buffer2.resize(size);
+    bool match = true;
+    for (size_t ii = 0; ii < std::min(static_cast<std::size_t>(size), pkt.size()); ++ii)
+    {
+        if (buffer2[ii] != buffer[ii])
+        {
+            std::cout << " byte [" << std::dec << ii << "] of "
+                      << std::min(static_cast<std::size_t>(size), pkt.size())
+                      << " does not match pkt =" << std::hex
+                      << static_cast<std::uint32_t>(buffer[ii])
+                      << " buffer=" << static_cast<std::uint32_t>(buffer2[ii]) << std::dec << std::endl;
+            match = false;
+        }
+    }
+
+    EXPECT_TRUE(match);
+
+    std::filesystem::remove(fileName);
+}
+
+
+TEST_F(PMU_TCP, json_data_generation)
+{
+    const auto &pkt = p.getPacketMatch(sync_lead, 1);
+
+    Config cfg;
+    EXPECT_EQ(parseConfig2(pkt.data(), pkt.size(), cfg), ParseResult::parse_complete);
+
+    const auto &pktData = p.getPacketMatch(sync_lead, 3);
+    auto pktType = getPacketType(pktData.data(), pktData.size());
+    EXPECT_EQ(pktType, PmuPacketType::data);
+    auto pdf = parseDataFrame(pktData.data(), pktData.size(), cfg);
+    EXPECT_EQ(pdf.pmus.size(), 1U);
+    EXPECT_EQ(pdf.pmus[0].phasors.size(), 4U);
+
+    std::vector<std::uint8_t> buffer;
+    buffer.resize(1024);
+    
+    Json::Value v = Json::objectValue;
+    
+    c37118::writeDataFile("testData.json", pdf);
+    auto pdf2v = c37118::loadDataFile("testData.json");
+    EXPECT_EQ(pdf2v.size(), 1U);
+    auto &pdf2 = pdf2v.front();
+
+    // now actually try to generate it
+    auto size = generateDataFrame(buffer.data(), 1024, cfg, pdf2);
+    EXPECT_EQ(size, pktData.size());
+    buffer.resize(size);
+    bool match = true;
+    for (size_t ii = 0; ii < std::min(buffer.size(), pktData.size()); ++ii)
+    {
+        if (buffer[ii] != pktData[ii])
+        {
+            std::cout << " byte [" << std::dec << ii << "] does not match pkt=" << std::hex
+                      << static_cast<std::uint32_t>(pktData[ii])
+                      << " buffer=" << static_cast<std::uint32_t>(buffer[ii]) << std::dec << std::endl;
+            match = false;
+        }
+    }
+
+    EXPECT_TRUE(match);
 }

@@ -283,7 +283,7 @@ TimeQuality parseTimeQuality(std::uint8_t tq)
     return timeQuality;
 }
 
-static std::uint8_t getTimeQualityCode(float tolerance)
+std::uint8_t getTimeQualityCode(float tolerance)
 {
     std::uint8_t code{0};
     while (tqArray[code] < tolerance)

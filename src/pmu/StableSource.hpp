@@ -12,7 +12,6 @@ namespace pmu
 	{
       public:
         c37118::PmuDataFrame stableData;
-        c37118::Config stableConfig;
 
          virtual void loadConfig(const std::string &configStr) override;
 

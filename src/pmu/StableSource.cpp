@@ -5,11 +5,24 @@ the top-level NOTICE for additional details. All rights reserved. SPDX-License-I
 */
 
 #include "StableSource.hpp"
+#include "JsonProcessingFunctions.hpp"
+#include "configure.hpp"
 
 namespace pmu
 {
 
-    void StableSource::loadConfig(const std::string &configStr) { config = stableConfig;
+    void StableSource::loadConfig(const std::string &configStr) { 
+        auto jv = c37118::fileops::loadJson(configStr);
+        config=c37118::loadConfigJson(jv);
+        if (jv.isMember("default"))
+        {
+            stableData = c37118::loadDataFrame(jv["default"],false);
+        }
+        else if (jv.isMember("data"))
+        {
+            stableData = c37118::loadDataFrame(jv["data"],false);
+        }
+        
     }
 
     void StableSource::loadDataFrame(const c37118::Config &dataConfig,

@@ -35,6 +35,10 @@ static constexpr std::uint16_t send_config1_command{0b0100};
 static constexpr std::uint16_t send_config2_command{0b0101};
 static constexpr std::uint16_t send_config3_command{0b0110};
 static constexpr std::uint16_t extended_frame_command{0b1000};
+
+static constexpr std::int16_t default_data_rate{30};
+static constexpr std::uint32_t default_time_base{1000000};
+
 enum class PmuPacketType : uint8_t
 {
     data = data_frame_code,
@@ -149,10 +153,10 @@ class Config
 {
   public:
     std::uint16_t idcode{0};
-    std::int16_t dataRate{30};
+    std::int16_t dataRate{default_data_rate};
     std::uint32_t soc;
     std::uint32_t fracsec;
-    std::uint32_t timeBase{1000000};
+    std::uint32_t timeBase{default_time_base};
     std::vector<PmuConfig> pmus;
 };
 

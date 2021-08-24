@@ -141,6 +141,14 @@ inline void replaceIfMember(const Json::Value& element, const std::string& key, 
     }
 }
 
+inline void replaceIfMember(const Json::Value &element, const std::string &key, std::uint32_t &sval)
+{
+    if (element.isMember(key))
+    {
+        sval = element[key].asUInt();
+    }
+}
+
 inline void replaceIfMember(const Json::Value &element, const std::string &key, std::int16_t &sval)
 {
     if (element.isMember(key))
