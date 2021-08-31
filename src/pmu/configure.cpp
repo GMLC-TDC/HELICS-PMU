@@ -209,7 +209,7 @@ PmuData loadPmuDataJson(const Json::Value &jv)
     }
     for (auto &digital : jv["digital"])
     {
-        data.analog.push_back(static_cast<std::uint16_t>(digital.asUInt()));
+        data.digital.push_back(static_cast<std::uint16_t>(digital.asUInt()));
     }
     return data;
 }

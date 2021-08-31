@@ -16,6 +16,7 @@ set(pmu_sources
     Pmu.cpp
     configure.cpp
     JsonProcessingFunctions.cpp
+    TcpPmu.cpp
 	)
 
 set(pmu_headers
@@ -30,6 +31,7 @@ set(pmu_headers
     Pmu.hpp
     configure.hpp
     JsonProcessingFunctions.hpp
+    TcpPmu.hpp
     ${PROJECT_SOURCE_DIR}/ThirdParty/date/tz.cpp
 	)
 

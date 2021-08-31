@@ -401,10 +401,10 @@ TEST_F(PMU_TCP, json_data_generation)
     std::vector<std::uint8_t> buffer;
     buffer.resize(1024);
     
-    Json::Value v = Json::objectValue;
     
-    c37118::writeDataFile("testData.json", pdf);
-    auto pdf2v = c37118::loadDataFile("testData.json");
+    std::string fileName = "testData.json";
+    c37118::writeDataFile(fileName, pdf);
+    auto pdf2v = c37118::loadDataFile(fileName);
     EXPECT_EQ(pdf2v.size(), 1U);
     auto &pdf2 = pdf2v.front();
 
@@ -425,4 +425,132 @@ TEST_F(PMU_TCP, json_data_generation)
     }
 
     EXPECT_TRUE(match);
+
+    std::filesystem::remove(fileName);
+}
+
+
+TEST_F(PMU2_TCP, json_data_generation)
+{
+    const auto &pkt1 = p.getPacketMatch(sync_lead, 1);
+    auto pktType = getPacketType(pkt1.data(), pkt1.size());
+    EXPECT_EQ(pktType, PmuPacketType::config2);
+    Config cfg1;
+    auto result = parseConfig2(pkt1.data(), pkt1.size(), cfg1);
+    ASSERT_EQ(result, ParseResult::parse_complete);
+
+    const auto &pkt2 = p.getPacketMatch(sync_lead, 4);
+    pktType = getPacketType(pkt2.data(), pkt2.size());
+    EXPECT_EQ(pktType, PmuPacketType::config2);
+    Config cfg2;
+    result = parseConfig2(pkt2.data(), pkt2.size(), cfg2);
+    ASSERT_EQ(result, ParseResult::parse_complete);
+
+    int jj = 5;
+    std::size_t psize{10};
+    std::string fileName = "testData1.json";
+    while (psize != 0)
+    {
+        const auto &pktData = p.getPacketMatch(sync_lead, jj++);
+        psize = pktData.size();
+        if (psize == 0)
+        {
+            continue;
+        }
+        pktType = getPacketType(pktData.data(), pktData.size());
+        if (pktType != PmuPacketType::data)
+        {
+            continue;
+        }
+        auto id = getIdCode(pktData.data(), pktData.size());
+        const Config &cfg = (id == cfg1.idcode) ? cfg1 : cfg2;
+        auto data = parseDataFrame(pktData.data(), pktData.size(), cfg);
+
+
+        
+        c37118::writeDataFile(fileName, data);
+        auto pdf2v = c37118::loadDataFile(fileName);
+        EXPECT_EQ(pdf2v.size(), 1U);
+        auto &pdf2 = pdf2v.front();
+
+        std::vector<std::uint8_t> dataBuffer;
+        dataBuffer.resize(4096);
+
+        auto sz = getPacketSize(pktData.data(), pktData.size());
+        auto size = generateDataFrame(dataBuffer.data(), 4096, cfg, pdf2);
+        EXPECT_EQ(size, sz);
+        dataBuffer.resize(size);
+        bool match = true;
+        for (size_t ii = 0; ii < std::min(dataBuffer.size(), static_cast<size_t>(sz)); ++ii)
+        {
+            if (dataBuffer[ii] != pktData[ii])
+            {
+                std::cout << " byte [" << std::dec << ii << "] does not match pkt=" << std::hex
+                          << static_cast<std::uint32_t>(pktData[ii])
+                          << " buffer=" << static_cast<std::uint32_t>(dataBuffer[ii]) << std::dec << std::endl;
+                match = false;
+            }
+        }
+        EXPECT_TRUE(match);
+        if (!match)
+        {
+            std::cout << "packet " << jj << " failed config " << ((id == cfg1.idcode) ? 1 : 2) << "\n";
+            psize = 0;
+        }
+        // this takes a while so only do a small number
+        if (jj>30)
+        {
+            break;
+        }
+    }
+    std::filesystem::remove(fileName);
+}
+
+TEST_F(PMU4_TCP, json_data_generation)
+{
+    const auto &pkt = p.getPacket(4);
+    auto pktType = getPacketType(pkt.data(), pkt.size());
+    EXPECT_EQ(pktType, PmuPacketType::config2);
+    Config cfg;
+    auto result = parseConfig2(pkt.data(), pkt.size(), cfg);
+    std::vector<std::uint8_t> buffer(pkt.begin(), pkt.end());
+    if (result == ParseResult::length_mismatch)
+    {
+        buffer.insert(buffer.end(), p.getPacket(5).begin(), p.getPacket(5).end());
+        result = parseConfig2(buffer.data(), buffer.size(), cfg);
+    }
+
+    auto &pktData = p.getPacket(7);
+    pktType = getPacketType(pktData.data(), pktData.size());
+    ASSERT_EQ(pktType, PmuPacketType::data);
+
+    auto data = parseDataFrame(pktData.data(), pktData.size(), cfg);
+
+    // run it through the json first
+     std::string fileName = "testData4.json";
+    c37118::writeDataFile(fileName, data);
+    auto pdf2v = c37118::loadDataFile(fileName);
+    EXPECT_EQ(pdf2v.size(), 1U);
+    auto &pdf2 = pdf2v.front();
+
+    std::vector<std::uint8_t> dataBuffer;
+    dataBuffer.resize(4096);
+
+    auto size = generateDataFrame(dataBuffer.data(), 4096, cfg, pdf2);
+    EXPECT_EQ(size, pktData.size());
+    dataBuffer.resize(size);
+    bool match = true;
+    for (size_t ii = 0; ii < std::min(dataBuffer.size(), pktData.size()); ++ii)
+    {
+        if (dataBuffer[ii] != pktData[ii])
+        {
+            std::cout << " byte [" << std::dec << ii << "] does not match pkt=" << std::hex
+                      << static_cast<std::uint32_t>(pktData[ii])
+                      << " buffer=" << static_cast<std::uint32_t>(dataBuffer[ii]) << std::dec << std::endl;
+            match = false;
+        }
+    }
+
+    EXPECT_TRUE(match);
+    std::filesystem::remove(fileName);
 }

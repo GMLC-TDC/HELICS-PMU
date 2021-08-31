@@ -20,7 +20,15 @@ namespace pmu
         }
         else if (jv.isMember("data"))
         {
-            stableData = c37118::loadDataFrame(jv["data"],false);
+            if (jv["data"].isArray())
+            {
+                stableData = c37118::loadDataFrame(jv["data"][0], false);
+            }
+            else
+            {
+                stableData = c37118::loadDataFrame(jv["data"], false);
+            }
+            
         }
         
     }
@@ -33,7 +41,6 @@ namespace pmu
         auto tc = c37118::generateTimeCodes(current_time, dataConfig);
         frame.soc = tc.first;
         frame.idcode = tc.second;
-        
     }
 
 }  // namespace pmu
