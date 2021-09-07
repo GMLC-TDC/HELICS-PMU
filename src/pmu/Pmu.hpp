@@ -5,6 +5,10 @@ the top-level NOTICE for additional details. All rights reserved. SPDX-License-I
 */
 #pragma once
 #include "asio/io_context.hpp"
+#include "asio/steady_timer.hpp"
+#include "AsioContextManager.h"
+
+#include <chrono>
 #include <memory>
 #include "Source.hpp"
 #include <vector>
@@ -16,19 +20,20 @@ namespace pmu
 class Pmu
 {
   protected:
-    std::shared_ptr<Source> source;
-    std::chrono::time_point<std::chrono::system_clock> start_time;
+    std::shared_ptr<Source> mSource;
+    
     double TimeMultiplier{1.0};
 
     std::vector<std::function<void(const c37118::PmuDataFrame &pdf)>> callbacks;
 
-    std::chrono::time_point<std::chrono::system_clock> start_time;
-    double TimeMultiplier{1.0};
-
   private:
     std::shared_ptr<asio::io_context> mContext;
     std::thread executionThread;
-
+    asio::steady_timer mTimer;
+    decltype(std::chrono::steady_clock::now()) start_time;
+    std::chrono::nanoseconds clock_time;
+    std::shared_ptr<AsioContextManager> contextPtr;  //!< context manager to for handling real time operations
+    decltype(contextPtr->startContextLoop()) loopHandle;  //!< loop controller for async real time operations
   public:
     Pmu();
     explicit Pmu(const std::string &configStr);
@@ -46,5 +51,8 @@ class Pmu
 
     void start();
     void startThread();
+
+  protected:
+    virtual std::chrono::nanoseconds getClockTime();
 };
 }  // namespace pmu

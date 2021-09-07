@@ -14,15 +14,23 @@ namespace pmu
     class Source
     {
       protected:
-        c37118::Config config;
+        c37118::Config mConfig;
 
       public:
+        virtual ~Source() = default;
         /** load the system configuration*/
+        void setConfig(const c37118::Config &config) { mConfig = config; }
         virtual void loadConfig(const std::string &configStr);
 
+        void fillDataFrame(c37118::PmuDataFrame &frame, std::chrono::nanoseconds frame_time);
+
+      protected:
         virtual void loadDataFrame(const c37118::Config &dataConfig,
                                    c37118::PmuDataFrame &frame,
-                                   std::chrono::time_point<std::chrono::system_clock> current_time) = 0;
+                                   std::chrono::nanoseconds frame_time) = 0;
     };
 	
-}
+    std::unique_ptr<Source> generateSource(const std::string &configFile);
+
+    std::unique_ptr<Source> generateSource(const std::string &type, const std::string &configFile);
+    }

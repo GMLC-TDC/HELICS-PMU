@@ -13,20 +13,20 @@ namespace pmu
 
     void StableSource::loadConfig(const std::string &configStr) { 
         auto jv = c37118::fileops::loadJson(configStr);
-        config=c37118::loadConfigJson(jv);
+        mConfig=c37118::loadConfigJson(jv);
         if (jv.isMember("default"))
         {
-            stableData = c37118::loadDataFrame(jv["default"],false);
+            mStableData = c37118::loadDataFrame(jv["default"],false);
         }
         else if (jv.isMember("data"))
         {
             if (jv["data"].isArray())
             {
-                stableData = c37118::loadDataFrame(jv["data"][0], false);
+                mStableData = c37118::loadDataFrame(jv["data"][0], false);
             }
             else
             {
-                stableData = c37118::loadDataFrame(jv["data"], false);
+                mStableData = c37118::loadDataFrame(jv["data"], false);
             }
             
         }
@@ -35,12 +35,12 @@ namespace pmu
 
     void StableSource::loadDataFrame(const c37118::Config &dataConfig,
                                      c37118::PmuDataFrame &frame,
-                                     std::chrono::time_point<std::chrono::system_clock> current_time)
+                                     std::chrono::nanoseconds current_time)
     {
-        frame = stableData;
+        frame = mStableData;
         auto tc = c37118::generateTimeCodes(current_time, dataConfig);
         frame.soc = tc.first;
-        frame.idcode = tc.second;
+        frame.fracSec = tc.second;
     }
 
 }  // namespace pmu

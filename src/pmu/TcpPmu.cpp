@@ -4,7 +4,9 @@ Battelle Memorial Institute; Lawrence Livermore National Security, LLC; Alliance
 the top-level NOTICE for additional details. All rights reserved. SPDX-License-Identifier: BSD-3-Clause
 */
 
-#include "Pmu.hpp"
+#include "TcpPmu.hpp"
+
+#include "TcpHelperClasses.h"
 
 #include <asio/io_context.hpp>
 #include <asio/dispatch.hpp>

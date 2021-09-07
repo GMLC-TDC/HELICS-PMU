@@ -911,17 +911,17 @@ std::uint16_t generateCommand(std::uint8_t *data, size_t dataSize, PmuCommand co
     return commandSize;
 }
 
-std::pair<std::uint32_t, std::uint32_t> generateTimeCodes(std::chrono::time_point<std::chrono::system_clock> tp,
+std::pair<std::uint32_t, std::uint32_t> generateTimeCodes(std::chrono::nanoseconds tp,
                                                           std::uint32_t timeBase,
                                                           float tolerance)
 {
-    auto secondsUTC = std::chrono::duration_cast<std::chrono::seconds>(tp.time_since_epoch()).count();
+    auto secondsUTC = std::chrono::duration_cast<std::chrono::seconds>(tp).count();
     std::pair<std::uint32_t, std::uint32_t> res;
     res.first = static_cast<std::uint32_t>(secondsUTC);
 
-    auto frac = tp - std::chrono::time_point<std::chrono::system_clock>(std::chrono::seconds(secondsUTC));
+    auto frac = tp - std::chrono::duration_cast<std::chrono::seconds>(tp);
 
-    double frsec = static_cast<double>(std::chrono::duration_cast<std::chrono::nanoseconds>(frac).count()) / 1e9;
+    double frsec = static_cast<double>(frac.count()) / 1e9;
     res.second = (static_cast<std::uint32_t>(frsec * static_cast<double>(timeBase)) & 0x00FFFFFFU);
 
     auto tqcode = getTimeQualityCode(tolerance);
@@ -930,7 +930,5 @@ std::pair<std::uint32_t, std::uint32_t> generateTimeCodes(std::chrono::time_poin
 
     return res;
 }
-
-
 
 }  // namespace c37118

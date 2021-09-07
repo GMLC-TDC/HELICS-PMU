@@ -17,6 +17,7 @@ set(pmu_sources
     configure.cpp
     JsonProcessingFunctions.cpp
     TcpPmu.cpp
+    AsioContextManager.cpp
 	)
 
 set(pmu_headers
@@ -32,6 +33,7 @@ set(pmu_headers
     configure.hpp
     JsonProcessingFunctions.hpp
     TcpPmu.hpp
+    AsioContextManager.h
     ${PROJECT_SOURCE_DIR}/ThirdParty/date/tz.cpp
 	)
 

@@ -1,5 +1,5 @@
 /*
-Copyright (c) 2017-2020,
+Copyright (c) 2021,
 Battelle Memorial Institute; Lawrence Livermore National Security, LLC; Alliance for Sustainable Energy, LLC.  See
 the top-level NOTICE for additional details. All rights reserved. SPDX-License-Identifier: BSD-3-Clause
 */
@@ -10,13 +10,15 @@ namespace pmu
 {
 	class StableSource: public Source
 	{
-      public:
-        c37118::PmuDataFrame stableData;
+      protected:
+        c37118::PmuDataFrame mStableData;
 
+      public:
+        void setData(const c37118::PmuDataFrame &data) { mStableData = data; }
          virtual void loadConfig(const std::string &configStr) override;
 
         virtual void loadDataFrame(const c37118::Config &dataConfig,
                                    c37118::PmuDataFrame &frame,
-                                   std::chrono::time_point<std::chrono::system_clock> current_time) override;
+                                    std::chrono::nanoseconds current_time) override;
 	};
 }
